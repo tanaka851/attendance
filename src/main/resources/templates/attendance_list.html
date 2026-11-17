@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>勤怠状況一覧・連絡先管理</title>
+    <style>
+        body {
+            font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+            margin: 20px;
+            font-size: 14px;
+            color: #111;
+        }
+        .container {
+            border: 1px solid #333;
+            padding: 20px 25px;
+            max-width: 980px;
+            margin: 0 auto;
+            background-color: #fff;
+        }
+        /* ヘッダー */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .user-info {
+            font-size: 14px;
+        }
+        .user-info a {
+            margin-left: 8px;
+            text-decoration: none;
+            color: #0056b3;
+        }
+        /* パンくず */
+        .breadcrumb {
+            margin-bottom: 15px;
+            font-size: 13px;
+            color: #555;
+        }
+        /* メッセージ表示エリア */
+        .msg-area {
+            min-height: 24px;
+            margin-bottom: 15px;
+        }
+        .msg-success {
+            color: #155724;
+            font-weight: bold;
+        }
+        /* 連絡先登録・変更枠 */
+        .contact-box {
+            border: 1px solid #777;
+            padding: 15px 20px;
+            margin-bottom: 25px;
+            border-radius: 3px;
+        }
+        .contact-box legend {
+            font-weight: bold;
+            padding: 0 6px;
+        }
+        .form-row {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            margin-bottom: 12px;
+        }
+        .form-row:last-child {
+            margin-bottom: 0;
+        }
+        .form-group {
+            display: flex;
+            align-items: center;
+        }
+        .form-group label {
+            width: 150px;
+        }
+        .badge-req { color: #d9534f; font-size: 12px; font-weight: bold; }
+        .badge-opt { color: #555; font-size: 12px; }
+        input[type="text"], input[type="email"] {
+            padding: 5px 8px;
+            border: 1px solid #aaa;
+            border-radius: 3px;
+            font-size: 13px;
+        }
+        /* ボタン */
+        .btn {
+            padding: 5px 12px;
+            cursor: pointer;
+            border: 1px solid #666;
+            background: #eee;
+            border-radius: 3px;
+            font-size: 13px;
+            text-decoration: none;
+            color: black;
+            display: inline-block;
+        }
+        .btn:hover { background: #ddd; }
+
+        /* 一覧見出し */
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+        /* 絞り込みツールバー */
+        .table-tools {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 13px;
+        }
+        .table-tools select {
+            padding: 3px 6px;
+            font-size: 13px;
+        }
+        /* テーブル */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+        }
+        th, td {
+            border: 1px solid #555;
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 13px;
+        }
+        th {
+            background-color: #f2f2f2;
+            text-align: center;
+            font-weight: bold;
+        }
+        td.center { text-align: center; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- ヘッダー -->
+    <div class="header">
+        <h1>勤怠管理システム</h1>
+        <div class="user-info">
+            [ログイン中: <span th:text="${loginUser}">山田 太郎</span>]
+            [<a href="#">ログアウト</a>]
+        </div>
+    </div>
+
+    <!-- パンくず -->
+    <div class="breadcrumb">ホーム &gt; 勤怠状況一覧・連絡先管理</div>
+
+    <!-- 完了メッセージ表示エリア -->
+    <div class="msg-area">
+        <span th:if="${successMessage}" class="msg-success" th:text="${successMessage}"></span>
+    </div>
+
+    <!-- 自分の連絡先登録・変更 -->
+    <fieldset class="contact-box">
+        <legend>[自分の連絡先登録・変更]</legend>
+        <form th:action="@{/attendance/list/update-contact}" method="post">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>電話番号 <span class="badge-req">[必須]</span> :</label>
+                    <input type="text" name="phone" th:value="${myEmployee.phone}" style="width: 160px;" required />
+                </div>
+                <div class="form-group">
+                    <label>メールアドレス <span class="badge-req">[必須]</span> :</label>
+                    <input type="email" name="email" th:value="${myEmployee.email}" style="width: 220px;" required />
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>備考/特記事項 <span class="badge-opt">[任意]</span> :</label>
+                    <input type="text" name="note" th:value="${myEmployee.note}" style="width: 300px;" />
+                </div>
+                <button type="submit" class="btn">[ 連絡先を更新する ]</button>
+            </div>
+        </form>
+    </fieldset>
+
+    <!-- 所属部署の勤怠状況 見出し -->
+    <div class="table-header">
+        <span>■ 所属部署の勤怠状況（所属: <span th:text="${department}">開発第1部</span>）</span>
+        <span>対象日: <span th:text="${#temporals.format(targetDate, 'yyyy/MM/dd')}">2026/10/21</span></span>
+    </div>
+
+    <!-- 絞り込みツールバー -->
+    <div class="table-tools">
+        <div>
+            絞り込み:
+            <select id="statusFilter" onchange="filterTable()">
+                <option value="ALL">すべて ▼</option>
+                <option value="勤務中">出勤中（勤務中）</option>
+                <option value="退勤済">退勤（退勤済）</option>
+                <option value="未出勤">未出勤</option>
+            </select>
+            <button type="button" class="btn" style="margin-left: 10px;" onclick="location.reload();">[ 最新に更新 ]</button>
+        </div>
+        <div>
+            表示件数: 全 <span th:text="${countTotal}">4</span> 名 
+            (出勤中: <span th:text="${countWorking}">2</span>名 / 
+             退勤: <span th:text="${countLeft}">1</span>名 / 
+             未出勤: <span th:text="${countBefore}">1</span>名)
+        </div>
+    </div>
+
+    <!-- 勤怠一覧テーブル -->
+    <table id="attendanceTable">
+        <thead>
+            <tr>
+                <th style="width: 50px;">No</th>
+                <th style="width: 110px;">氏名</th>
+                <th style="width: 90px;">勤怠状況</th>
+                <th style="width: 100px;">勤務場所</th>
+                <th style="width: 140px;">電話番号</th>
+                <th style="width: 210px;">メールアドレス</th>
+                <th>備考</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="row : ${attendanceList}">
+                <td class="center" th:text="${row.no}">01</td>
+                <td th:text="${row.name}">山田太郎</td>
+                <td class="center status-col" th:text="${row.statusLabel}">勤務中</td>
+                <td class="center" th:text="${row.workLocation}">オフィス</td>
+                <td th:text="${row.phone}">090-1234-5678</td>
+                <td th:text="${row.email}">taro@example.com</td>
+                <td th:text="${row.note}">(自分)</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- メニューに戻る -->
+    <div>
+        <a href="/" class="btn">[ メニューに戻る ]</a>
+    </div>
+</div>
+
+<script>
+    // 絞り込みドロップダウンの即時反映スクリプト
+    function filterTable() {
+        const filterVal = document.getElementById("statusFilter").value;
+        const rows = document.querySelectorAll("#attendanceTable tbody tr");
+
+        rows.forEach(row => {
+            const statusText = row.querySelector(".status-col").textContent.trim();
+            if (filterVal === "ALL" || statusText === filterVal) {
+                row.style.display = "";
+            } else {
+                row.style.display = "none";
+            }
+        });
+    }
+</script>
+
+</body>
+</html>

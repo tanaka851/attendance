@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>勤怠管理システム - ダッシュボード</title>
+  <style>
+    body { font-family: sans-serif; background-color: #f4f6f8; margin: 0; padding: 20px; color: #333; }
+    .container { max-width: 900px; margin: 0 auto; background: #fff; border: 1px solid #ccc; border-radius: 6px; padding: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+    .stamp-area { background: #fafafa; border: 2px solid #0056b3; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
+    .clock { font-size: 32px; font-weight: bold; margin-bottom: 5px; }
+    .status-badge { font-size: 18px; margin-bottom: 15px; }
+    .btn-group { display: flex; justify-content: center; gap: 15px; margin-bottom: 15px; }
+    .btn { width: 120px; height: 60px; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 6px; border: 1px solid #aaa; }
+    .btn:disabled { background: #e0e0e0; color: #888; cursor: not-allowed; }
+    .btn-in { background: #28a745; color: white; border: none; }
+    .btn-out { background: #dc3545; color: white; border: none; }
+    .btn-break { background: #ffc107; color: black; border: none; }
+    .grid { display: flex; gap: 20px; }
+    .card { flex: 1; border: 1px solid #ddd; border-radius: 6px; padding: 15px; background: #fff; }
+    textarea { width: 95%; height: 80px; margin-top: 5px; }
+    .nav-link { display: inline-block; padding: 6px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; }
+    .nav-link:hover { background: #0056b3; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <div>
+      <span id="today-date" style="font-weight: bold;"></span>
+      <span style="margin-left: 15px;">[ログイン中: <strong id="emp-name" style="color: blue;">-</strong>]</span>
+      <a href="/logout" style="margin-left: 8px; font-size: 13px; color: #d9534f;">ログアウト</a>
+    </div>
+    <div>
+      勤務場所: 
+      <select id="work-location">
+        <option value="オフィス">オフィス</option>
+        <option value="自宅">自宅(リモート)</option>
+        <option value="客先/外出先">客先/外出先</option>
+      </select>
+      <!-- 一覧画面へのリンクボタン -->
+      <a href="/attendance/list" class="nav-link" style="margin-left: 10px;">📋 勤怠状況一覧へ</a>
+    </div>
+  </div>
+
+  <!-- クイック打刻エリア -->
+  <div class="stamp-area">
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="status-badge" id="status-badge">現在のステータス: 読み込み中...</div>
+    
+    <div class="btn-group">
+      <button id="btn-in" class="btn btn-in" onclick="stamp('CLOCK_IN')">出　勤</button>
+      <button id="btn-out" class="btn btn-out" onclick="stamp('CLOCK_OUT')">退　勤</button>
+      <button id="btn-break-start" class="btn btn-break" onclick="stamp('BREAK_START')">休憩開始</button>
+      <button id="btn-break-end" class="btn btn-break" onclick="stamp('BREAK_END')">休憩終了</button>
+    </div>
+    <div id="history">本日の打刻履歴: なし</div>
+  </div>
+
+  <!-- 下部2カラム -->
+  <div class="grid">
+    <div class="card">
+      <h3>今月の勤務概況 (リアルタイム)</h3>
+      <p>・総労働時間: 128時間30分</p>
+      <p>・当月残業時間: 18時間15分 <span style="color:green;">(正常)</span></p>
+      <p>・出勤日数: 16日</p>
+    </div>
+    <div class="card">
+      <h3>仕事内容の報告</h3>
+      <textarea id="daily-report" placeholder="本日の業務進捗を入力"></textarea>
+      <br>
+      <button onclick="saveReport()" style="margin-top:5px; padding: 6px 12px; cursor: pointer;">報告を保存</button>
+      <hr>
+      <h4>【社内アナウンス】</h4>
+      <p style="font-size:12px;">・2026/10/20: 来月のシフト希望提出期限について</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 今日の日付をセット
+  const today = new Date();
+  document.getElementById('today-date').innerText = today.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+
+  // 時計の更新
+  setInterval(() => {
+    const now = new Date();
+    document.getElementById('clock').innerText = now.toTimeString().split(' ')[0];
+  }, 1000);
+
+  // 画面の初期化・データ取得
+  async function loadDashboard() {
+    const res = await fetch('/api/dashboard');
+    const data = await res.json();
+    
+    // 社員名
+    document.getElementById('emp-name').innerText = data.employeeName;
+
+    // ステータス表示
+    let color = "#333";
+    if (data.status === 'WORKING') color = "green";
+    if (data.status === 'ON_BREAK') color = "orange";
+    if (data.status === 'LEFT') color = "blue";
+    
+    document.getElementById('status-badge').innerHTML = 
+      `現在のステータス: <span style="color:${color}; font-weight:bold;">● ${data.statusLabel}</span>` +
+      (data.clockInTime ? ` (出勤 ${data.clockInTime})` : "");
+    
+    if (data.clockInTime) {
+      document.getElementById('history').innerText = `本日の打刻履歴: ${data.clockInTime} [出勤]`;
+    }
+
+    document.getElementById('daily-report').value = data.dailyReport || "";
+
+    // 勤務場所の反映
+    if (data.workLocation) {
+      document.getElementById('work-location').value = data.workLocation;
+    }
+
+    // ボタンの活性・非活性制御
+    document.getElementById('btn-in').disabled = (data.status !== 'BEFORE_WORK');
+    document.getElementById('btn-out').disabled = (data.status !== 'WORKING');
+    document.getElementById('btn-break-start').disabled = (data.status !== 'WORKING');
+    document.getElementById('btn-break-end').disabled = (data.status !== 'ON_BREAK');
+  }
+
+  // 打刻API呼び出し
+  async function stamp(type) {
+    const location = document.getElementById('work-location').value;
+    await fetch('/api/stamp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stampType: type, workLocation: location })
+    });
+    loadDashboard();
+  }
+
+  // 日報保存API呼び出し
+  async function saveReport() {
+    const text = document.getElementById('daily-report').value;
+    await fetch('/api/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ report: text })
+    });
+    alert("日報を保存しました！");
+  }
+
+  loadDashboard();
+</script>
+</body>
+</html>
